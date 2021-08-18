@@ -1,13 +1,10 @@
 ﻿using Microsoft.Xrm.Sdk;
 using RMC.Contract.Model.TypeCrm;
-using RMC.Contract.Model;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Dynamic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace RMC.DTO.CRM.Converter
 {
@@ -16,6 +13,7 @@ namespace RMC.DTO.CRM.Converter
         private static readonly Dictionary<string, PropertyInfo> _propertyMap;
         static Mapper()
         {
+
             _propertyMap = typeof(T).GetProperties().Where(x => x.GetCustomAttributesData().Count > 0).ToDictionary(
                     p => p.GetCustomAttributes(typeof(DisplayNameAttribute), true).Cast<DisplayNameAttribute>().Single().DisplayName.ToLower(),
                     p => p
@@ -51,7 +49,26 @@ namespace RMC.DTO.CRM.Converter
                         else if (kv.Value.GetType().Name == nameof(Money))
                             p.SetValue(destination, new MoedaCRM(((Money)kv.Value).Value));
                         else if (kv.Value.GetType().Name == nameof(EntityReference))
-                            p.SetValue(destination, new ReferencialCRM(((EntityReference)kv.Value).Id, ((EntityReference)kv.Value).LogicalName));
+                            p.SetValue(destination, new ReferencialCRM(((EntityReference)kv.Value).Id, ((EntityReference)kv.Value).LogicalName, ((EntityReference)kv.Value).Name));
+                        else if (kv.Value.GetType().Name == nameof(OptionSetValueCollection))
+                        {
+                            if (kv.Value != null && ((OptionSetValueCollection)kv.Value).Count > 0)
+                            {
+                                List<ConjuntoOpcoesCRM> list = new List<ConjuntoOpcoesCRM>();
+
+                                foreach (var item in (OptionSetValueCollection)kv.Value)
+                                {
+                                    var value = new ConjuntoOpcoesCRM(item.Value);
+                                    list.Add(value);
+                                }
+
+                                p.SetValue(destination, list);
+                            }
+                        }
+                        else
+                        {
+                            p.SetValue(destination, kv.Value, null);
+                        }
                     }
                     else
                         p.SetValue(destination, kv.Value, null);
@@ -60,6 +77,7 @@ namespace RMC.DTO.CRM.Converter
         }
         public static void Map(T source, Entity destination)
         {
+
             Microsoft.Xrm.Sdk.AttributeCollection attributeCollection = new Microsoft.Xrm.Sdk.AttributeCollection();
             PropertyInfo p = destination.GetType().GetProperty("Attributes");
             foreach (var item in _propertyMap)

@@ -1,5 +1,8 @@
 ﻿using Microsoft.PowerPlatform.Dataverse.Client;
+using Microsoft.Xrm.Sdk.Messages;
+using Microsoft.Xrm.Sdk.Metadata;
 using Microsoft.Xrm.Sdk.Query;
+using RMC.Contract.Model.TypeCrm;
 using RMC.DTO.CRM.Converter;
 using RMC.DTO.CRM.Interface;
 using RMC.DTO.CRM.Singleton;
@@ -42,7 +45,7 @@ namespace RMC.DTO.CRM.Repository
                                                    .Select(x => x.GetCustomAttributes(typeof(DisplayNameAttribute), true)
                                                    .Cast<DisplayNameAttribute>().Single().DisplayName.ToLower()).ToArray();
             QueryExpression Query = new QueryExpression(nomeLogico);
-            
+
             if (filter != null)
                 Query.Criteria = filter;
 
@@ -76,7 +79,7 @@ namespace RMC.DTO.CRM.Repository
         public List<T> ListByFilter(string nomeLogico, QueryRequest filter = null)
         {
             FilterExpression filterExpression = new FilterExpression();
-            foreach(var condition in filter.Filter)
+            foreach (var condition in filter.Filter)
             {
                 filterExpression.AddCondition(condition.Campo, (ConditionOperator)condition.Operador, condition.Condition);
             }
@@ -94,6 +97,54 @@ namespace RMC.DTO.CRM.Repository
         {
             Service.Update(Mapper<T>.ToEntity(entity));
         }
+
+        public List<ConjuntoOpcoesCRM> GetOptionSet(string entityName, string attributeName)
+        {
+            List<OptionMetadata> options = new List<OptionMetadata>();
+            List<ConjuntoOpcoesCRM> conjuntoOpcoes = new List<ConjuntoOpcoesCRM>();
+            RetrieveAttributeRequest request = new RetrieveAttributeRequest()
+            {
+                EntityLogicalName = entityName,
+                LogicalName = attributeName,
+                RetrieveAsIfPublished = true
+            };
+
+            RetrieveAttributeResponse response = (RetrieveAttributeResponse)Service.Execute(request);
+
+            if (response.AttributeMetadata.GetType() == typeof(PicklistAttributeMetadata))
+            {
+                PicklistAttributeMetadata retrieved = (PicklistAttributeMetadata)response.AttributeMetadata;
+                options = retrieved.OptionSet.Options.ToArray().ToList();
+            }
+            else if (response.AttributeMetadata.GetType() == typeof(MultiSelectPicklistAttributeMetadata))
+            {
+                MultiSelectPicklistAttributeMetadata retrieved = (MultiSelectPicklistAttributeMetadata)response.AttributeMetadata;
+                options = retrieved.OptionSet.Options.ToArray().ToList();
+            }
+            else if (response.AttributeMetadata.GetType() == typeof(StatusAttributeMetadata))
+            {
+                StatusAttributeMetadata retrieved = (StatusAttributeMetadata)response.AttributeMetadata;
+                options = retrieved.OptionSet.Options.ToArray().ToList();
+            }
+            else if (response.AttributeMetadata.GetType() == typeof(StateAttributeMetadata))
+            {
+                StateAttributeMetadata retrieved = (StateAttributeMetadata)response.AttributeMetadata;
+                options = retrieved.OptionSet.Options.ToArray().ToList();
+            }
+            options = options.OrderBy(o => o.Label.LocalizedLabels[0].Label.ToString()).ToList();
+            foreach (var item in options)
+            {
+                if (item.Label == null || item.Label.LocalizedLabels.Count == 0 || item.Value == null)
+                    continue;
+                conjuntoOpcoes.Add(new ConjuntoOpcoesCRM
+                {
+                    Label = item.Label.LocalizedLabels[0].Label.ToString(),
+                    Valor = item.Value.Value
+                });
+            }
+            return conjuntoOpcoes;
+        }
+
     }
 
 }
